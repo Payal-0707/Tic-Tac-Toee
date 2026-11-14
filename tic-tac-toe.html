@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tic-Tac-Toe</title>
+<style>
+  :root {
+    --bg: #eef1f8; --panel: #ffffff; --ink: #1d2340; --muted: #6a7291;
+    --cell: #e2e7f5; --cell-hover: #d3daf0; --x: #e0338f; --o: #e8a100; --win: #cdeedd;
+    --line: #c9d0e6;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12162b; --panel: #1c2240; --ink: #eef0fb; --muted: #98a1c8;
+      --cell: #2a3157; --cell-hover: #353d6a; --x: #ff5aa8; --o: #ffc533; --win: #1f5a44;
+      --line: #343c68; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12162b; --panel: #1c2240; --ink: #eef0fb; --muted: #98a1c8;
+    --cell: #2a3157; --cell-hover: #353d6a; --x: #ff5aa8; --o: #ffc533; --win: #1f5a44;
+    --line: #343c68; color-scheme: dark;
+  }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+  }
+  main { width: min(92vw, 420px); padding: 16px 0; text-align: center; }
+  h1 { margin: 0 0 4px; font-size: 2rem; letter-spacing: .5px; }
+  #status { min-height: 1.6em; margin: 0 0 16px; font-size: 1.2rem; color: var(--muted); }
+  #status b { color: var(--ink); }
+  #board {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    background: var(--panel); padding: 12px; border-radius: 18px;
+    border: 1px solid var(--line);
+  }
+  .cell {
+    aspect-ratio: 1; border: 0; border-radius: 12px; background: var(--cell);
+    font: 700 min(16vw, 4.2rem) "Trebuchet MS", system-ui, sans-serif;
+    cursor: pointer; color: var(--ink); padding: 0;
+  }
+  .cell:hover:not(:disabled) { background: var(--cell-hover); }
+  .cell:focus-visible, button.act:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .cell:disabled { cursor: default; }
+  .cell.X { color: var(--x); } .cell.O { color: var(--o); }
+  .cell.win { background: var(--win); }
+  #scores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
+  .score { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 4px; }
+  .score span { display: block; font-size: .95rem; color: var(--muted); }
+  .score strong { font-size: 1.9rem; }
+  #sx strong { color: var(--x); } #so strong { color: var(--o); }
+  .row { display: flex; gap: 10px; }
+  button.act {
+    flex: 1; padding: 12px; font: 600 1rem "Trebuchet MS", system-ui, sans-serif; cursor: pointer;
+    border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  }
+  button.act.main { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tic-Tac-Toe</h1>
+  <p id="status" aria-live="polite"></p>
+
+  <div id="board" role="grid" aria-label="Tic-Tac-Toe board"></div>
+
+  <div id="scores">
+    <div class="score" id="sx"><span>X wins</span><strong id="xw">0</strong></div>
+    <div class="score"><span>Draws</span><strong id="dw">0</strong></div>
+    <div class="score" id="so"><span>O wins</span><strong id="ow">0</strong></div>
+  </div>
+
+  <div class="row">
+    <button class="act main" id="restart">Restart game</button>
+    <button class="act" id="reset">Reset scores</button>
+  </div>
+</main>
+
+<script>
+  var LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  var board, turn, over, scores = { X: 0, O: 0, D: 0 };
+  var boardEl = document.getElementById("board");
+  var statusEl = document.getElementById("status");
+  var cells = [];
+
+  for (var i = 0; i < 9; i++) {
+    var b = document.createElement("button");
+    b.className = "cell";
+    b.setAttribute("aria-label", "Cell " + (i + 1));
+    b.addEventListener("click", (function (n) { return function () { play(n); }; })(i));
+    boardEl.appendChild(b);
+    cells.push(b);
+  }
+
+  function findWin() {
+    for (var i = 0; i < LINES.length; i++) {
+      var l = LINES[i];
+      if (board[l[0]] && board[l[0]] === board[l[1]] && board[l[1]] === board[l[2]]) return l;
+    }
+    return null;
+  }
+
+  function draw() {
+    for (var i = 0; i < 9; i++) {
+      cells[i].textContent = board[i];
+      cells[i].className = "cell" + (board[i] ? " " + board[i] : "");
+      cells[i].disabled = over || board[i] !== "";
+    }
+    document.getElementById("xw").textContent = scores.X;
+    document.getElementById("ow").textContent = scores.O;
+    document.getElementById("dw").textContent = scores.D;
+  }
+
+  function play(n) {
+    if (over || board[n]) return;
+    board[n] = turn;
+    var w = findWin();
+    if (w) {
+      over = true; scores[turn]++;
+      draw();
+      w.forEach(function (i) { cells[i].classList.add("win"); });
+      statusEl.innerHTML = "<b>Player " + turn + "</b> wins!";
+      return;
+    }
+    if (board.indexOf("") === -1) {
+      over = true; scores.D++; draw();
+      statusEl.textContent = "It’s a draw.";
+      return;
+    }
+    turn = turn === "X" ? "O" : "X";
+    draw();
+    statusEl.innerHTML = "Turn: <b>Player " + turn + "</b>";
+  }
+
+  function restart() {
+    board = ["","","","","","","","",""]; turn = "X"; over = false;
+    draw();
+    statusEl.innerHTML = "Turn: <b>Player X</b>";
+  }
+
+  document.getElementById("restart").addEventListener("click", restart);
+  document.getElementById("reset").addEventListener("click", function () {
+    scores = { X: 0, O: 0, D: 0 }; restart();
+  });
+  restart();
+</script>
+</body>
+</html>
